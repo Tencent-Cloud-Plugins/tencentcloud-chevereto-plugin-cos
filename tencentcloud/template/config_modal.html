@@ -1,0 +1,267 @@
+<!--
+* Copyright (C) 2020 Tencent Cloud.
+*
+* Licensed under the Apache License, Version 2.0 (the "License");
+* you may not use this file except in compliance with the License.
+* You may obtain a copy of the License at
+*
+*      http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing, software
+* distributed under the License is distributed on an "AS IS" BASIS,
+* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+* See the License for the specific language governing permissions and
+* limitations under the License.
+-->
+<style type="text/css">
+    .config-modal {
+        font-family: Arial, Helvetica, sans-serif;
+        position: fixed;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        background: #000;
+        z-index: 99999;
+        opacity: 0;
+        -webkit-transition: opacity 400ms ease-in;
+        -moz-transition: opacity 400ms ease-in;
+        transition: opacity 400ms ease-in;
+        pointer-events: none;
+    }
+    .config-modal:target {
+        opacity: 0.95;
+        pointer-events: auto;
+    }
+    .close-modal-btn{
+        float: right;
+    }
+
+    .config-modal-dialog {
+        width: 600px;
+        position: relative;
+        margin: 5% auto;
+        padding: 5px 20px 13px 20px;
+        border-radius: 10px;
+        background: #fff;
+    }
+</style>
+
+<a href="#config-modal" id="modal-open" style="display: none"></a>
+<div id="config-modal" class="config-modal">
+    <div class="config-modal-dialog">
+        <a href="#" title="关闭" class="close-modal-btn" id="modal-close">X</a>
+        <div style="text-align: center;margin-top: 1rem"><h3>腾讯云COS设置</h3></div>
+        <form action="" method="post">
+            <div class="input-label">
+                <label for="secret-id">SecretId</label>
+                <input type="password" name="secretId" autocomplete="off" id="secret-id" class="text-input" value="{{secretId}}" onfocus="focusEvent(this)" onblur="blurEvent(this)">
+                <div class="input-below">SecretId</div>
+            </div>
+
+            <div class="input-label">
+                <label for="secret-key">SecretKey</label>
+                <input type="password" name="secretKey" autocomplete="off" id="secret-key" class="text-input" value="{{secretKey}}" onfocus="focusEvent(this)" onblur="blurEvent(this)">
+                <div class="input-below">访问<a href="https://console.qcloud.com/cam/capi" target="_blank">密钥管理</a>获取SecretId和SecretKey或通过"新建密钥"创建密钥串</div>
+            </div>
+
+            <div class="input-label">
+                <label for="bucket">存储桶名称</label>
+                <input type="text" name="bucket" id="bucket" class="text-input" value="{{bucket}}">
+                <div class="input-below">访问<a href="https://console.cloud.tencent.com/cos5/bucket" target="_blank">腾讯云控制台</a>创建存储桶或填写存储桶列表里的存储桶名称</div>
+            </div>
+
+            <div class="input-label">
+                <label for="region">所属区域</label>
+                <input type="text" name="region" id="region" class="text-input" value="{{region}}">
+                <div class="input-below">此处填写的"所属区域"的值必须和腾讯云对象存储中存储桶的所属区域一致</div>
+            </div>
+
+            <div class="input-label">
+                <label for="upload-local-file">上传存量图片</label>
+                <div class="c5 phablet-c1"><select type="text" name="upload-local-file" id="upload-local-file" class="text-input">
+                    <option value="1" {{uploadFile}}}>开启</option>
+                    <option value="0" {{dontUpload}}}>关闭</option>
+                </select>
+                </div>
+                <div class="input-below">在访问图片时，如图片不存在于COS则将其上传到COS。</div>
+            </div>
+
+            <div class="input-label">
+                <label for="del-local-file">保留本地文件</label>
+                <div class="c5 phablet-c1"><select type="text" name="del-local-file" id="del-local-file" class="text-input">
+                    <option value="1" {{saveFile}}}>开启</option>
+                    <option value="0" {{delFile}}}>关闭</option>
+                </select>
+                </div>
+                <div class="input-below red-warning">如关闭，图片上传COS后将删除本地的图片文件，请谨慎选择。</div>
+            </div>
+            <div class="input-label">
+                <button type="button" id="test-config-btn" class="btn btn-input">测试配置是否正确</button>
+            </div>
+            <button type="button" id="save-config-btn" class="btn btn-input blue">保存</button>
+        </form>
+        <div style="text-align: center;flex: 0 0 auto;margin-top: 0.6rem;">
+            <a href="https://openapp.qq.com/docs/Chevereto/cos.html" target="_blank">文档中心</a> | <a href="https://github.com/Tencent-Cloud-Plugins/tencentcloud-chevereto-cos" target="_blank">GitHub</a> | <a
+                href="https://support.qq.com/product/164613" target="_blank">意见反馈</a>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript">
+    function isJsonStr(str) {
+        if (typeof str == 'string') {
+            try {
+                var obj=JSON.parse(str);
+                if(typeof obj == 'object' && obj ){
+                    return obj;
+                }else{
+                    return false;
+                }
+            } catch(e) {
+                return false;
+            }
+        }
+        return false;
+    }
+
+
+    function ajax(options) {
+        options = options || {};
+        options.type = (options.type || 'GET').toUpperCase();
+        options.dataType = options.dataType || 'json';
+        params = formatParams(options.data);
+        var xhr= new XMLHttpRequest();
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState === 4) {
+                var status = xhr.status;
+                if ((status >= 200 && status < 210) || status === 404) {
+                    options.success && options.success(xhr.responseText,status);
+                } else {
+                    options.error && options.error(status);
+                }
+            }
+        }
+        if (options.type === 'GET') {
+            xhr.open('GET', options.url + '?' + params, true);
+            xhr.send(null);
+        } else if (options.type === 'POST') {
+            xhr.open('POST', options.url, true);
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            xhr.send(params);
+        }
+    }
+
+    function formatParams(data){
+        var arr=[];
+        for(var name in data){
+            arr.push(encodeURIComponent(name)+'='+encodeURIComponent(data[name]));
+        }
+        return arr.join('&');
+    }
+
+    function focusEvent(obj) {
+        obj.setAttribute("type","text");
+    }
+
+    function blurEvent(obj) {
+        obj.setAttribute("type","password");
+    }
+
+    document.querySelector("#save-config-btn").addEventListener("click", function() {
+        var secretId = document.querySelector("#secret-id").value;
+        var secretKey = document.querySelector("#secret-key").value;
+        var bucket = document.querySelector("#bucket").value;
+        var region = document.querySelector("#region").value;
+        var token = document.querySelector("input[name='auth_token']").value;
+        var delSelect = document.querySelector("#del-local-file");
+        var delLocalFile = delSelect.options[delSelect.selectedIndex].value;
+        var uploadSelect = document.querySelector("#upload-local-file");
+        var uploadLocalFile = uploadSelect.options[uploadSelect.selectedIndex].value;
+
+        ajax({
+            url:'/dashboard/settings/cos',
+            type:'POST',
+            dataType:'json',
+            data:{
+                action: 'cos_setting',
+                secretId:secretId,
+                secretKey:secretKey,
+                bucket:bucket,
+                region:region,
+                auth_token:token,
+                uploadLocalFile:uploadLocalFile,
+                delLocalFile:delLocalFile
+            },
+            success:function(response){
+                var res = isJsonStr(response)
+                if (res && res.code !== 0) {
+                    alert(res.msg);
+                    return;
+                }
+                if (window.location.hash !== ""){
+                    window.location.hash = "";
+                }
+                alert('成功');
+                window.location.reload();
+            },
+            error:function(status){
+                console.log('status',status);
+            }
+        });
+    });
+
+    document.querySelector("#test-config-btn").addEventListener("click", function() {
+        var secretId = document.querySelector("#secret-id").value;
+        var secretKey = document.querySelector("#secret-key").value;
+        var bucket = document.querySelector("#bucket").value;
+        var region = document.querySelector("#region").value;
+        var token = document.querySelector("input[name='auth_token']").value;
+        var button = document.querySelector("#test-config-btn");
+        ajax({
+            url:'/dashboard/settings/test',
+            type:'POST',
+            dataType:'json',
+            data:{
+                action: 'cos_setting',
+                secretId:secretId,
+                secretKey:secretKey,
+                bucket:bucket,
+                region:region,
+                auth_token:token,
+            },
+            success:function(response){
+                var res = isJsonStr(response);
+                if (!res || !res.valid) {
+                    button.classList.add("red");
+                    button.classList.remove("green");
+                    button.innerHTML = "配置填写错误";
+                    return;
+                }
+                button.classList.remove("red");
+                button.classList.add("green");
+                button.innerHTML = "配置填写正确";
+            },
+            error:function(status){
+                console.log('status',status);
+            }
+        });
+
+    });
+
+
+    document.querySelector("#tencentcloud-setting-link").addEventListener("click", function() {
+        document.querySelector("#modal-open").click();
+    });
+
+    // document.querySelector("#modal-close").addEventListener("click", function() {
+    //     document.querySelector("#list-most-oldest").style.display = 'block';
+    //     document.querySelector("#list-most-viewed").style.display = 'block';
+    //     document.querySelector("#list-most-recent").style.display = 'block';
+    //
+    // });
+
+
+
+
+</script>
